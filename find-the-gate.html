@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Find the Gate — Airport Quest (B1)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --blue:#2f6fed; --blue-d:#1d50bb; --navy:#142a4a;
+    --orange:#ff8a3d; --amber:#ffcf4d;
+    --good:#1faa59; --good-d:#157f42;   /* green = ONLY for correct/checked */
+    --bad:#e23d3d; --bad-d:#b32626;
+    --ink:#16243b; --muted:#5b6b85;
+    --card:#ffffff; --line:#d8e0ef;
+    --sky-a:255,217,160; --sky-b:142,197,255; /* lerp dawn -> sky */
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    font-family:'Nunito',system-ui,Arial,sans-serif;
+    color:var(--ink);
+    background:#eaf1ff;
+    display:flex; justify-content:center;
+  }
+  #app{
+    width:100%; max-width:560px; height:650px;
+    background:linear-gradient(180deg, rgba(255,217,160,1) 0%, rgba(255,236,210,1) 40%, #eef4ff 100%);
+    display:flex; flex-direction:column; position:relative; overflow:hidden;
+    transition:background .8s ease;
+  }
+  /* ---------- top bar ---------- */
+  #hud{flex:0 0 auto; padding:10px 12px 8px; background:rgba(20,42,74,.92); color:#fff;}
+  .hud-row{display:flex; align-items:center; gap:10px;}
+  .score-box{
+    background:var(--amber); color:var(--navy); font-weight:900;
+    border-radius:12px; padding:6px 12px; font-size:16px; white-space:nowrap;
+    box-shadow:inset 0 -3px 0 rgba(0,0,0,.12);
+  }
+  #scoreNum{display:inline-block; transition:transform .15s ease;}
+  .score-pop{transform:scale(1.45) translateY(-2px); color:var(--good);}
+  .stage-tag{font-size:12px; font-weight:800; opacity:.85; text-transform:uppercase; letter-spacing:.5px; margin-left:auto;}
+  .journey{margin-top:9px;}
+  .journey-label{font-size:11px; font-weight:800; opacity:.9; display:flex; justify-content:space-between; margin-bottom:3px;}
+  .bar{position:relative; height:14px; background:rgba(255,255,255,.18); border-radius:99px; overflow:visible;}
+  .bar-fill{height:100%; width:0%; background:linear-gradient(90deg,var(--orange),var(--amber)); border-radius:99px; transition:width .5s ease;}
+  .plane{position:absolute; top:-7px; left:0%; transition:left .5s ease; font-size:18px; transform:translateX(-50%);}
+  /* ---------- main ---------- */
+  #main{flex:1 1 auto; overflow-y:auto; padding:14px; -webkit-overflow-scrolling:touch;}
+  h2.title{font-size:19px; margin:2px 0 2px;}
+  .ru{color:var(--muted); font-size:13px; font-weight:700; margin:0 0 12px;}
+  .prompt{font-size:16px; font-weight:800; line-height:1.4; background:#fff; border:2px solid var(--line); border-radius:14px; padding:12px 14px; margin-bottom:12px;}
+  .prompt .hint{display:block; color:var(--muted); font-size:13px; font-weight:700; margin-top:4px;}
+  /* buttons */
+  .btn{font-family:inherit; cursor:pointer; border:none; border-radius:12px; font-weight:800;}
+  .opt{
+    display:block; width:100%; text-align:left; background:#fff; color:var(--ink);
+    border:2px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:9px;
+    font-size:15px; font-weight:700; transition:transform .08s, border-color .15s, background .15s;
+  }
+  .opt:hover{border-color:var(--blue);}
+  .opt:active{transform:scale(.99);}
+  .opt.correct{background:#e7f7ee; border-color:var(--good); color:var(--good-d);}
+  .opt.wrong{background:#fdeaea; border-color:var(--bad); color:var(--bad-d);}
+  .opt:disabled{cursor:default;}
+  .action{background:var(--blue); color:#fff; padding:12px 18px; font-size:16px; box-shadow:inset 0 -3px 0 var(--blue-d);}
+  .action:active{transform:translateY(1px);}
+  .ghost{background:#fff; color:var(--blue); border:2px solid var(--blue);}
+  .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center;}
+  /* type input */
+  .inp{font-family:inherit; font-size:16px; font-weight:800; padding:12px 14px; border:2px solid var(--line); border-radius:12px; width:100%; outline:none;}
+  .inp:focus{border-color:var(--blue);}
+  .gapline{font-size:17px; font-weight:800; line-height:1.7; margin-bottom:12px;}
+  .gapline .blank{color:var(--orange); border-bottom:3px solid var(--orange); padding:0 18px;}
+  .attempts{font-size:13px; font-weight:800; color:var(--muted); margin:8px 0;}
+  .inline-bad{color:var(--bad-d); font-weight:800; font-size:14px; margin:8px 0;}
+  /* tiles (build) */
+  .tilebank,.tileanswer{display:flex; flex-wrap:wrap; gap:8px; min-height:46px;}
+  .tileanswer{border:2px dashed var(--line); border-radius:12px; padding:8px; margin-bottom:10px; background:#fbfdff;}
+  .tile{background:#fff; border:2px solid var(--blue); color:var(--blue-d); border-radius:10px; padding:8px 12px; font-size:15px; font-weight:800; cursor:pointer;}
+  .tile.used{opacity:.25; pointer-events:none;}
+  .tile.placed{background:var(--blue); color:#fff;}
+  /* memory */
+  .mgrid{display:grid; grid-template-columns:repeat(4,1fr); gap:8px;}
+  .mcard{aspect-ratio:1/1.15; perspective:600px; cursor:pointer;}
+  .mcard-inner{position:relative; width:100%; height:100%; transition:transform .35s; transform-style:preserve-3d;}
+  .mcard.flip .mcard-inner{transform:rotateY(180deg);}
+  .mface{position:absolute; inset:0; backface-visibility:hidden; border-radius:12px; display:flex; align-items:center; justify-content:center; text-align:center; padding:4px; font-weight:800; font-size:13px;}
+  .mfront{background:linear-gradient(135deg,var(--blue),var(--blue-d)); color:#fff; font-size:24px;}
+  .mback{background:#fff; border:2px solid var(--line); color:var(--ink); transform:rotateY(180deg);}
+  .mcard.done .mback{background:#e7f7ee; border-color:var(--good); color:var(--good-d);}
+  .mcard.done{cursor:default;}
+  /* dialogue */
+  .dlg{background:#fff; border:2px solid var(--line); border-radius:14px; padding:12px; margin-bottom:12px; font-size:15px; line-height:1.9; font-weight:700;}
+  .dlg b{color:var(--navy);}
+  .gap{display:inline-block; min-width:120px; border-bottom:2px dashed var(--orange); color:var(--orange); font-weight:800; text-align:center; cursor:pointer; padding:0 6px;}
+  .gap.filled{color:var(--blue-d); border-bottom-color:var(--blue);}
+  .gap.ok{color:var(--good-d); border-bottom-color:var(--good);}
+  .gap.no{color:var(--bad-d); border-bottom-color:var(--bad);}
+  .gap.sel{background:#fff3e6; border-radius:6px;}
+  .phrase{background:#fff; border:2px solid var(--blue); color:var(--blue-d); border-radius:10px; padding:8px 12px; font-size:14px; font-weight:800; cursor:pointer;}
+  .phrase.sel{background:var(--blue); color:#fff;}
+  .phrase.used{opacity:.25; pointer-events:none;}
+  /* boss */
+  .boss-wrap{text-align:center; margin-bottom:10px;}
+  .boss-svg{width:120px; height:120px; transition:transform .2s;}
+  .boss-hit{animation:shake .35s;}
+  @keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-7px)}75%{transform:translateX(7px)}}
+  .hp-label{font-size:12px; font-weight:900; color:var(--navy); margin-bottom:3px;}
+  .hpbar{height:16px; background:#f1d4d4; border-radius:99px; overflow:hidden; border:2px solid #d99;}
+  .hp-fill{height:100%; background:linear-gradient(90deg,var(--bad),#ff7a7a); width:100%; transition:width .35s;}
+  /* toast */
+  #toast{position:absolute; left:50%; top:90px; transform:translateX(-50%) translateY(-20px); opacity:0; pointer-events:none;
+    background:var(--good); color:#fff; font-weight:900; font-size:18px; padding:10px 20px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.2); transition:all .25s; z-index:30;}
+  #toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+  /* modal (persists; has cross) */
+  #overlay{position:absolute; inset:0; background:rgba(20,42,74,.55); display:none; align-items:center; justify-content:center; padding:18px; z-index:40;}
+  #overlay.show{display:flex;}
+  .modal{background:#fff; border-radius:18px; padding:18px; width:100%; max-width:420px; position:relative; box-shadow:0 20px 50px rgba(0,0,0,.3);}
+  .modal .x{position:absolute; top:8px; right:10px; border:none; background:#f0f3f9; color:var(--muted); width:34px; height:34px; border-radius:50%; font-size:20px; font-weight:900; cursor:pointer;}
+  .modal .x:hover{background:#e23d3d; color:#fff;}
+  .modal h3{margin:2px 0 8px; font-size:20px;}
+  .modal h3.bad{color:var(--bad-d);}
+  .modal .ans{background:#e7f7ee; border:2px solid var(--good); color:var(--good-d); border-radius:12px; padding:10px 12px; font-weight:800; font-size:16px; margin:6px 0 14px;}
+  .modal .note{color:var(--muted); font-size:13px; font-weight:700; margin-bottom:12px;}
+  /* start / end */
+  .center{display:flex; flex-direction:column; align-items:center; text-align:center; justify-content:center; height:100%; padding:24px;}
+  .big{font-size:30px; font-weight:900; margin:6px 0;}
+  .lead{font-size:15px; font-weight:700; color:var(--muted); max-width:380px; margin:8px 0 16px;}
+  .stars{font-size:40px; letter-spacing:6px; margin:10px 0;}
+  .pill{display:inline-block; background:#fff; border:2px solid var(--line); border-radius:99px; padding:6px 14px; font-weight:800; font-size:14px; margin:4px;}
+  @media (max-width:430px){
+    #app{height:640px;}
+    .mgrid{gap:6px;}
+    .mface{font-size:12px;}
+    .mfront{font-size:20px;}
+    h2.title{font-size:17px;}
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="hud">
+    <div class="hud-row">
+      <div class="score-box">⭐ <span id="scoreNum">0</span></div>
+      <div class="stage-tag" id="stageTag">START</div>
+    </div>
+    <div class="journey">
+      <div class="journey-label"><span>🛫 Way to the gate / Путь до гейта</span><span id="jPct">0%</span></div>
+      <div class="bar"><div class="bar-fill" id="jFill"></div><span class="plane" id="plane">✈️</span></div>
+    </div>
+  </div>
+  <div id="main"></div>
+  <div id="toast"></div>
+  <div id="overlay"><div class="modal" id="modal"></div></div>
+</div>
+
+<script>
+"use strict";
+
+/* ============================= DATA ============================= */
+const MEMORY = [
+  {en:"airport",        ru:"аэропорт"},
+  {en:"gate",           ru:"выход на посадку"},
+  {en:"flight",         ru:"рейс"},
+  {en:"boarding pass",  ru:"посадочный талон"},
+  {en:"passport",       ru:"паспорт"},
+  {en:"luggage",        ru:"багаж"},
+  {en:"departures",     ru:"табло вылетов"},
+  {en:"terminal",       ru:"терминал"},
+];
+
+const MCQ = [
+  { q:"You want to know where your gate is.", ru:"Где твой выход на посадку?",
+    correct:"Where is my gate?",
+    bad:["Where my gate is?","Where is gate?","My gate where is?","Where are my gate?","Where gate is?"] },
+  { q:"You want to know what time the flight boards.", ru:"Во сколько посадка на рейс?",
+    correct:"What time does the flight board?",
+    bad:["What time the flight boards?","What time does the flight boards?","When boards the flight?","What time is the flight board?","Does the flight board what time?"] },
+  { q:"Ask a worker politely where the check-in is.", ru:"Вежливо: где регистрация?",
+    correct:"Could you tell me where the check-in is?",
+    bad:["Could you tell me where is the check-in?","Could you say me where the check-in is?","Could you telling me where the check-in is?","Could you tell where the check-in is?","Could you tell me where the check-in?"] },
+  { q:"Complete: ___ terminal is my flight? (you need a number)", ru:"Выбери вопросительное слово.",
+    correct:"Which",
+    bad:["Where","When","Who","How many","What time"] },
+  { q:"Choose the correct question.", ru:"Где табло вылетов?",
+    correct:"Where is the departures board?",
+    bad:["Where the departures board is?","Where are the departures board?","The departures board where is?","Where is departures board the?","Where is the departures board are?"] },
+  { q:"Choose the correct indirect question.", ru:"Косвенный вопрос: какой это гейт?",
+    correct:"Do you know which gate it is?",
+    bad:["Do you know which gate is it?","You know which gate it is?","Do you know which is gate it?","Do you knowing which gate it is?","Do you know which gate it?"] },
+  { q:"Ask if the flight is late.", ru:"Рейс задерживается?",
+    correct:"Is the flight delayed?",
+    bad:["Is delayed the flight?","The flight is delayed?","Does the flight delayed?","Is the flight delay?","Are the flight delayed?"] },
+  { q:"Ask how to get to the gate.", ru:"Как пройти к гейту?",
+    correct:"How do I get to the gate?",
+    bad:["How I get to the gate?","How do I get the gate?","How get I to the gate?","How does I get to the gate?","How do I getting to the gate?"] },
+];
+
+const BUILD = [
+  { ru:"Где мой выход на посадку?", tiles:["where","is","my","gate"], answer:"where is my gate" },
+  { ru:"Во сколько посадка на рейс?", tiles:["what","time","does","the","flight","board"], answer:"what time does the flight board" },
+  { ru:"Вы не подскажете, где гейт?", tiles:["could","you","tell","me","where","the","gate","is"], answer:"could you tell me where the gate is" },
+  { ru:"С какого терминала мой рейс?", tiles:["which","terminal","is","my","flight"], answer:"which terminal is my flight" },
+  { ru:"Вы не знаете, где регистрация?", tiles:["do","you","know","where","the","check-in","is"], answer:"do you know where the check-in is" },
+  { ru:"Рейс по расписанию?", tiles:["is","the","flight","on","time"], answer:"is the flight on time" },
+];
+
+const TYPE = [
+  { before:"Where", after:"my gate?", ru:"Где мой гейт? (вставь глагол)", answers:["is"] },
+  { before:"What time", after:"the flight board?", ru:"Во сколько посадка? (вспомогательный глагол)", answers:["does"] },
+  { before:"", after:"you tell me where the gate is?", ru:"Вежливый вопрос (модальный глагол)", answers:["could","can"] },
+  { before:"", after:"terminal is my flight?", ru:"С какого терминала рейс? (вопросительное слово)", answers:["which","what"] },
+  { before:"Is the flight", after:"?", ru:"Рейс задерживается? (= late)", answers:["delayed","late"] },
+  { before:"Do you", after:"where the check-in is?", ru:"Вы не знаете…? (глагол)", answers:["know"] },
+];
+
+const DIALOGUE = {
+  lines:[
+    {sp:"You", parts:["Excuse me, ", {gap:0}, "?"]},
+    {sp:"Staff", parts:["Of course! What do you need?"]},
+    {sp:"You", parts:[{gap:1}, "?"]},
+    {sp:"Staff", parts:["Can I see your boarding pass, please?"]},
+    {sp:"You", parts:["Yes, here it is."]},
+    {sp:"Staff", parts:["Your flight is from gate B12. ", {gap:2}, "."]},
+    {sp:"You", parts:[{gap:3}, "?"]},
+    {sp:"Staff", parts:["Take the escalator and follow the signs."]},
+    {sp:"You", parts:[{gap:4}, "?"]},
+    {sp:"Staff", parts:["No, it is delayed. ", {gap:5}, "."]},
+  ],
+  gaps:[
+    "could you help me",
+    "where is my gate",
+    "it is in terminal 2",
+    "how do I get there",
+    "is the flight on time",
+    "boarding starts at six",
+  ],
+};
+
+const BOSS = [
+  { q:"Politely ask where gate B12 is.", correct:"Could you tell me where gate B12 is?",
+    bad:["Could you tell me where is gate B12?","Where gate B12 is?","Could you telling me where gate B12 is?"] },
+  { q:"Choose the correct question.", correct:"What time does boarding start?",
+    bad:["What time boarding starts?","What time does boarding starts?","When starts boarding?"] },
+  { q:"Choose the correct question.", correct:"Which gate is my flight from?",
+    bad:["Which gate my flight is from?","Which gate is from my flight?","Which gate my flight from is?"] },
+  { q:"Ask if your flight is on time.", correct:"Is my flight on time?",
+    bad:["Is on time my flight?","My flight is on time?","Does my flight on time?"] },
+  { q:"Choose the correct indirect question.", correct:"Do you know where the security check is?",
+    bad:["Do you know where is the security check?","Do you know where the security check?","You know where the security check is?"] },
+  { q:"Ask how to get to terminal 2.", correct:"How can I get to terminal 2?",
+    bad:["How I can get to terminal 2?","How can I get terminal 2?","How can get I to terminal 2?"] },
+  { q:"Ask where to find the departures board.", correct:"Where can I find the departures board?",
+    bad:["Where I can find the departures board?","Where can I find departures board?","Where can find I the departures board?"] },
+  { q:"Ask what time your flight takes off.", correct:"What time does my flight take off?",
+    bad:["What time my flight takes off?","What time does my flight takes off?","When takes off my flight?"] },
+];
+
+/* total scored questions for max points + journey */
+const TOTAL_Q = MEMORY.length + MCQ.length + BUILD.length + TYPE.length + DIALOGUE.gaps.length + BOSS.length; // 42
+const MAX_POINTS = TOTAL_Q * 10; // 420
+
+/* ============================= STATE / HELPERS ============================= */
+const S = { score:0, progress:0 };
+const $ = id => document.getElementById(id);
+const main = $("main");
+
+function shuffle(a){ a=a.slice(); for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function norm(s){ return (s||"").toString().toLowerCase().trim().replace(/[?.!,]/g,"").replace(/\s+/g," "); }
+function cap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+
+function lerp(a,b,t){ return Math.round(a+(b-a)*t); }
+function updateBackground(t){
+  const a=[255,217,160], b=[142,197,255];
+  const top = `rgba(${lerp(a[0],b[0],t)},${lerp(a[1],b[1],t)},${lerp(a[2],b[2],t)},1)`;
+  $("app").style.background = `linear-gradient(180deg, ${top} 0%, rgba(238,244,255,1) 70%)`;
+}
+
+function addPoints(n){
+  S.score += n;
+  const el = $("scoreNum"); el.textContent = S.score;
+  el.classList.add("score-pop");
+  setTimeout(()=>el.classList.remove("score-pop"), 180);
+}
+function advanceJourney(){
+  S.progress++;
+  const pct = Math.min(100, Math.round(S.progress/TOTAL_Q*100));
+  $("jFill").style.width = pct+"%";
+  $("plane").style.left = pct+"%";
+  $("jPct").textContent = pct+"%";
+  updateBackground(Math.min(1, S.progress/TOTAL_Q));
+}
+
+function toast(){
+  const t=$("toast"); t.textContent="ВЕРНО! +10 ⭐️"; t.classList.add("show");
+  setTimeout(()=>t.classList.remove("show"), 1100);
+}
+
+/* persistent modal with cross; calls cb when closed */
+function showModal(correctAnswer, note, cb){
+  const m=$("modal");
+  m.innerHTML = `
+    <button class="x" aria-label="Закрыть">×</button>
+    <h3 class="bad">НЕВЕРНО ✕</h3>
+    <div class="note">Правильный ответ:</div>
+    <div class="ans">${correctAnswer}</div>
+    ${note?`<div class="note">${note}</div>`:""}
+    <button class="btn action" id="mNext">Дальше →</button>`;
+  $("overlay").classList.add("show");
+  const close=()=>{ $("overlay").classList.remove("show"); cb&&cb(); };
+  m.querySelector(".x").onclick=close;
+  $("mNext").onclick=close;
+}
+
+/* ============================= STAGE FLOW ============================= */
+const STAGES = [
+  {tag:"1 / VOCAB",   render:renderMemory},
+  {tag:"2 / QUESTIONS",render:renderMCQ},
+  {tag:"3 / BUILD",   render:renderBuild},
+  {tag:"4 / TYPE",    render:renderType},
+  {tag:"5 / DIALOGUE",render:renderDialogue},
+  {tag:"6 / BOSS",    render:renderBoss},
+];
+let stageIdx = 0;
+
+function nextStage(){
+  stageIdx++;
+  if(stageIdx>=STAGES.length){ renderEnd(); return; }
+  $("stageTag").textContent = STAGES[stageIdx].tag;
+  STAGES[stageIdx].render();
+}
+function startGame(){
+  stageIdx=0;
+  $("stageTag").textContent = STAGES[0].tag;
+  STAGES[0].render();
+}
+
+/* ---------- STAGE 1: MEMORY ---------- */
+function renderMemory(){
+  const deck = shuffle(MEMORY.flatMap((p,i)=>[
+    {id:i, txt:p.en, side:"en"}, {id:i, txt:p.ru, side:"ru"}
+  ]));
+  let first=null, lock=false, matched=0;
+  main.innerHTML = `
+    <h2 class="title">Stage 1 · Vocabulary</h2>
+    <p class="ru">Найди пары: английское слово ↔ перевод. Кликай по двум карточкам.</p>
+    <div class="mgrid" id="mgrid"></div>`;
+  const grid=$("mgrid");
+  deck.forEach((c,idx)=>{
+    const el=document.createElement("div");
+    el.className="mcard"; el.dataset.idx=idx; el.dataset.id=c.id;
+    el.innerHTML=`<div class="mcard-inner">
+        <div class="mface mfront">✈️</div>
+        <div class="mface mback">${c.txt}</div></div>`;
+    el.onclick=()=>flip(el,c);
+    grid.appendChild(el);
+  });
+  function flip(el,c){
+    if(lock||el.classList.contains("flip")||el.classList.contains("done")) return;
+    el.classList.add("flip");
+    if(!first){ first={el,c}; return; }
+    lock=true;
+    if(first.c.id===c.id && first.el!==el){
+      setTimeout(()=>{
+        el.classList.add("done"); first.el.classList.add("done");
+        addPoints(10); advanceJourney(); toast();
+        matched++; first=null; lock=false;
+        if(matched===MEMORY.length){ setTimeout(()=>showContinue("Все слова найдены!"), 700); }
+      },350);
+    } else {
+      setTimeout(()=>{ el.classList.remove("flip"); first.el.classList.remove("flip"); first=null; lock=false; }, 750);
+    }
+  }
+}
+
+function showContinue(msg){
+  main.innerHTML = `<div class="center">
+    <div class="big">✅ ${msg}</div>
+    <p class="lead">Отличная работа! Идём дальше к гейту.</p>
+    <button class="btn action" id="cont">Дальше →</button></div>`;
+  $("cont").onclick=nextStage;
+}
+
+/* ---------- generic single-question MCQ engine ---------- */
+function runMCQ(list, opts){
+  let i=0;
+  const isBoss = !!opts && opts.boss;
+  let hp = isBoss ? BOSS.length : 0;
+  function paintHP(){ if(isBoss) $("hp-fill").style.width=(hp/BOSS.length*100)+"%"; }
+  function step(){
+    if(i>=list.length){ opts&&opts.done&&opts.done(); return; }
+    const item=list[i];
+    const options=shuffle([{t:item.correct,ok:true}, ...item.bad.map(b=>({t:b,ok:false}))]);
+    const bossUI = isBoss ? `
+      <div class="boss-wrap">
+        <svg class="boss-svg" id="boss-svg" viewBox="0 0 100 100" aria-hidden="true">
+          <rect x="14" y="20" width="72" height="56" rx="8" fill="#142a4a"/>
+          <rect x="20" y="27" width="60" height="30" rx="4" fill="#ffcf4d"/>
+          <rect x="24" y="32" width="52" height="5" rx="2.5" fill="#142a4a"/>
+          <rect x="24" y="41" width="40" height="5" rx="2.5" fill="#142a4a"/>
+          <rect x="24" y="50" width="30" height="4" rx="2" fill="#142a4a"/>
+          <circle cx="36" cy="66" r="5" fill="#fff"/><circle cx="36" cy="66" r="2.5" fill="#142a4a"/>
+          <circle cx="64" cy="66" r="5" fill="#fff"/><circle cx="64" cy="66" r="2.5" fill="#142a4a"/>
+          <path d="M40 73 Q50 67 60 73" stroke="#fff" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+          <rect x="44" y="76" width="12" height="10" fill="#142a4a"/>
+        </svg>
+        <div class="hp-label">BOSS HP — Грозное табло вылетов</div>
+        <div class="hpbar"><div class="hp-fill" id="hp-fill" style="width:100%"></div></div>
+      </div>` : "";
+    main.innerHTML = `
+      ${bossUI}
+      <h2 class="title">${opts&&opts.title?opts.title:"Choose the correct question"} <span style="color:var(--muted);font-size:14px">(${i+1}/${list.length})</span></h2>
+      <div class="prompt">${item.q}${item.ru?`<span class="hint">${item.ru}</span>`:""}</div>
+      <div id="opts"></div>`;
+    const box=$("opts");
+    options.forEach(o=>{
+      const b=document.createElement("button");
+      b.className="opt"; b.textContent=o.t;
+      b.onclick=()=>choose(b,o,box,item);
+      box.appendChild(b);
+    });
+    paintHP();
+  }
+  function choose(btn,o,box,item){
+    [...box.children].forEach(c=>c.disabled=true);
+    if(o.ok){
+      btn.classList.add("correct");
+      addPoints(10); advanceJourney(); toast();
+      if(isBoss){
+        hp=Math.max(0,hp-1); paintHP();
+        const sv=$("boss-svg"); sv&&sv.classList.add("boss-hit");
+      }
+      i++; setTimeout(step, 1250);
+    } else {
+      btn.classList.add("wrong");
+      [...box.children].forEach(c=>{ if(c.textContent===item.correct) c.classList.add("correct"); });
+      if(isBoss){ hp=Math.min(BOSS.length,hp+1); paintHP(); }
+      showModal(item.correct, isBoss?"Босс восстановил здоровье! Соберись 💪":"", ()=>{ i++; step(); });
+    }
+  }
+  step();
+}
+
+/* ---------- STAGE 2: MCQ ---------- */
+function renderMCQ(){
+  main.scrollTop=0;
+  runMCQ(MCQ, {title:"Choose the correct question", done:()=>showContinue("Раздел вопросов пройден!")});
+}
+
+/* ---------- STAGE 3: BUILD ---------- */
+function renderBuild(){
+  let i=0;
+  function step(){
+    if(i>=BUILD.length){ showContinue("Все вопросы собраны!"); return; }
+    const item=BUILD[i];
+    let attempts=2;
+    const order=shuffle(item.tiles.map((t,k)=>({t,k})));
+    main.innerHTML = `
+      <h2 class="title">Stage 3 · Build the question <span style="color:var(--muted);font-size:14px">(${i+1}/${BUILD.length})</span></h2>
+      <div class="prompt">Собери вопрос из слов.<span class="hint">${item.ru}</span></div>
+      <div class="tileanswer" id="ans"></div>
+      <div class="tilebank" id="bank"></div>
+      <p class="attempts" id="att">Попыток: ${attempts}</p>
+      <div id="binline"></div>
+      <div class="row" style="margin-top:10px">
+        <button class="btn action" id="check">Проверить</button>
+        <button class="btn ghost" id="reset">Сбросить</button>
+      </div>`;
+    const bank=$("bank"), ans=$("ans");
+    const placed=[];
+    order.forEach(o=>{
+      const b=document.createElement("button");
+      b.className="tile"; b.textContent=o.t; b.dataset.k=o.k;
+      b.onclick=()=>{ if(b.classList.contains("used"))return; b.classList.add("used"); place(o,b); };
+      bank.appendChild(b);
+    });
+    function place(o,srcBtn){
+      const p=document.createElement("button");
+      p.className="tile placed"; p.textContent=o.t;
+      p.onclick=()=>{ p.remove(); srcBtn.classList.remove("used"); const idx=placed.indexOf(p); if(idx>-1)placed.splice(idx,1); };
+      placed.push(p); ans.appendChild(p);
+    }
+    function resetAll(){ ans.innerHTML=""; placed.length=0; [...bank.children].forEach(c=>c.classList.remove("used")); $("binline").innerHTML=""; }
+    $("reset").onclick=resetAll;
+    $("check").onclick=()=>{
+      const built=norm(placed.map(p=>p.textContent).join(" "));
+      if(built===norm(item.answer)){
+        placed.forEach(p=>{p.style.background="var(--good)";p.style.borderColor="var(--good)";});
+        addPoints(10); advanceJourney(); toast();
+        i++; setTimeout(step,1250);
+      } else {
+        attempts--;
+        if(attempts>0){
+          $("att").textContent="Попыток: "+attempts;
+          $("binline").innerHTML=`<p class="inline-bad">Не совсем. Проверь порядок слов и попробуй ещё раз.</p>`;
+        } else {
+          showModal(cap(item.answer)+"?", "Порядок слов в вопросе фиксированный.", ()=>{ i++; step(); });
+        }
+      }
+    };
+  }
+  step();
+}
+
+/* ---------- STAGE 4: TYPE ---------- */
+function renderType(){
+  let i=0;
+  function step(){
+    if(i>=TYPE.length){ showContinue("Все пропуски заполнены!"); return; }
+    const item=TYPE[i];
+    let attempts=2;
+    const line = `${item.before?item.before+" ":""}<span class="blank">?</span> ${item.after}`;
+    main.innerHTML = `
+      <h2 class="title">Stage 4 · Type the word <span style="color:var(--muted);font-size:14px">(${i+1}/${TYPE.length})</span></h2>
+      <div class="prompt">Впиши пропущенное слово.<span class="hint">${item.ru}</span></div>
+      <p class="gapline">${line}</p>
+      <input class="inp" id="inp" autocomplete="off" autocapitalize="off" placeholder="Напиши слово…">
+      <p class="attempts" id="att">Попыток: ${attempts}</p>
+      <div id="tinline"></div>
+      <div class="row" style="margin-top:10px"><button class="btn action" id="check">Проверить</button></div>`;
+    const inp=$("inp"); inp.focus();
+    function submit(){
+      const val=norm(inp.value);
+      if(!val) return;
+      if(item.answers.map(norm).includes(val)){
+        inp.style.borderColor="var(--good)"; inp.style.background="#e7f7ee"; inp.disabled=true;
+        addPoints(10); advanceJourney(); toast();
+        i++; setTimeout(step,1250);
+      } else {
+        attempts--;
+        if(attempts>0){
+          $("att").textContent="Попыток: "+attempts;
+          inp.style.borderColor="var(--bad)";
+          $("tinline").innerHTML=`<p class="inline-bad">Не то слово. Попробуй ещё раз.</p>`;
+        } else {
+          const shown=item.answers.map(cap).join(" / ");
+          showModal(shown, "", ()=>{ i++; step(); });
+        }
+      }
+    }
+    inp.addEventListener("keydown",e=>{ if(e.key==="Enter") submit(); });
+    $("check").onclick=submit;
+  }
+  step();
+}
+
+/* ---------- STAGE 5: DIALOGUE ---------- */
+function renderDialogue(){
+  main.scrollTop=0;
+  const gapCount=DIALOGUE.gaps.length;
+  const filled=new Array(gapCount).fill(null);   // phrase index placed in each gap
+  const solved=new Array(gapCount).fill(false);
+  let attemptsLeft=2, selectedPhrase=null;
+
+  function build(){
+    let dlg="";
+    DIALOGUE.lines.forEach(L=>{
+      let row=`<b>${L.sp}:</b> `;
+      L.parts.forEach(p=>{
+        if(typeof p==="string"){ row+=p; }
+        else{
+          const gi=p.gap;
+          const ph = filled[gi]!=null ? DIALOGUE.gaps[filled[gi]] : "_______";
+          let cls="gap"; if(filled[gi]!=null) cls+=" filled";
+          if(solved[gi]) cls+=" ok";
+          row+=`<span class="${cls}" data-gap="${gi}">${cap0(ph,filled[gi]!=null)}</span>`;
+        }
+      });
+      dlg+=`<div>${row}</div>`;
+    });
+    main.innerHTML = `
+      <h2 class="title">Stage 5 · Fill the dialogue</h2>
+      <p class="ru">Выбери фразу внизу, затем нажми на пропуск. Можно менять.</p>
+      <div class="dlg" id="dlg">${dlg}</div>
+      <div class="tilebank" id="bank"></div>
+      <p class="attempts" id="att">Попыток на проверку: ${attemptsLeft}</p>
+      <div class="row" style="margin-top:10px">
+        <button class="btn action" id="check">Проверить</button>
+        <button class="btn ghost" id="reset">Сбросить</button>
+      </div>`;
+    // gaps click
+    main.querySelectorAll(".gap").forEach(g=>{
+      const gi=+g.dataset.gap;
+      g.onclick=()=>{
+        if(solved[gi]) return;
+        if(selectedPhrase!=null){
+          // remove this phrase from any other gap
+          for(let k=0;k<gapCount;k++){ if(filled[k]===selectedPhrase) filled[k]=null; }
+          filled[gi]=selectedPhrase; selectedPhrase=null; build();
+        } else if(filled[gi]!=null){
+          filled[gi]=null; build();
+        }
+      };
+    });
+    // phrase bank
+    const bank=$("bank");
+    DIALOGUE.gaps.forEach((ph,pi)=>{
+      const used=filled.includes(pi);
+      const b=document.createElement("button");
+      b.className="phrase"+(used?" used":"")+(selectedPhrase===pi?" sel":"");
+      b.textContent=ph;
+      b.onclick=()=>{ selectedPhrase = (selectedPhrase===pi?null:pi); build(); };
+      bank.appendChild(b);
+    });
+    $("reset").onclick=()=>{ for(let k=0;k<gapCount;k++){ if(!solved[k]) filled[k]=null; } selectedPhrase=null; build(); };
+    $("check").onclick=check;
+  }
+  function cap0(txt, isFilled){ return isFilled?txt:txt; }
+  function check(){
+    if(filled.includes(null) && attemptsLeft>1){
+      $("att").textContent="Заполни все пропуски! Попыток: "+attemptsLeft;
+      return;
+    }
+    let newlyCorrect=0;
+    for(let gi=0; gi<gapCount; gi++){
+      if(solved[gi]) continue;
+      if(filled[gi]===gi){ solved[gi]=true; newlyCorrect++; }
+    }
+    if(newlyCorrect>0){ for(let n=0;n<newlyCorrect;n++){ addPoints(10); advanceJourney(); } toast(); }
+    // clear wrong (non-solved) fills
+    for(let gi=0; gi<gapCount; gi++){ if(!solved[gi]) filled[gi]=null; }
+    if(solved.every(Boolean)){ build(); setTimeout(()=>showContinue("Диалог собран — ты почти у гейта!"),700); return; }
+    attemptsLeft--;
+    if(attemptsLeft<=0){
+      // reveal all
+      for(let gi=0; gi<gapCount; gi++){ filled[gi]=gi; solved[gi]=true; }
+      build();
+      showModal("Все фразы расставлены по местам.", "Сверь правильные ответы в диалоге.", ()=>showContinue("Идём дальше!"));
+    } else {
+      build();
+    }
+  }
+  build();
+}
+
+/* ---------- STAGE 6: BOSS ---------- */
+function renderBoss(){
+  main.scrollTop=0;
+  runMCQ(BOSS, {boss:true, title:"BOSS · Choose the correct question",
+    done:()=>renderEnd()});
+}
+
+/* ---------- START / END ---------- */
+function renderStart(){
+  $("stageTag").textContent="START";
+  main.innerHTML = `<div class="center">
+    <div style="font-size:54px">🛫</div>
+    <div class="big">Find the Gate</div>
+    <p class="lead">Ты в аэропорту, а посадка скоро начнётся! Отвечай правильно, чтобы дойти до своего гейта B12. Учим лексику travel и вопросы (questions).</p>
+    <div>
+      <span class="pill">6 этапов</span>
+      <span class="pill">${TOTAL_Q} заданий</span>
+      <span class="pill">Max ${MAX_POINTS} ⭐</span>
+    </div>
+    <button class="btn action" id="start" style="margin-top:18px">Начать путь ✈️</button>
+  </div>`;
+  $("start").onclick=startGame;
+}
+
+function renderEnd(){
+  $("stageTag").textContent="FINISH";
+  S.progress=TOTAL_Q;
+  $("jFill").style.width="100%"; $("plane").style.left="100%"; $("jPct").textContent="100%"; updateBackground(1);
+  let stars=0;
+  if(S.score>=Math.round(MAX_POINTS*0.5)) stars=1;
+  if(S.score>=Math.round(MAX_POINTS*0.75)) stars=2;
+  if(S.score>=Math.round(MAX_POINTS*0.9)) stars=3;
+  const starStr = "⭐".repeat(stars) + "☆".repeat(3-stars);
+  const msg = stars===3 ? "Отлично! Ты добрался до гейта вовремя!"
+            : stars===2 ? "Здорово! Ты на борту."
+            : stars===1 ? "Ты успел, но в последний момент!"
+            : "Рейс почти улетел — попробуй ещё раз!";
+  main.innerHTML = `<div class="center">
+    <div style="font-size:50px">🛬</div>
+    <div class="big">Gate B12</div>
+    <div class="stars">${starStr}</div>
+    <p class="lead">${msg}</p>
+    <div><span class="pill">Очки: ${S.score} / ${MAX_POINTS}</span></div>
+    <button class="btn action" id="again" style="margin-top:18px">Сыграть ещё раз 🔁</button>
+  </div>`;
+  $("again").onclick=()=>{ S.score=0; S.progress=0; $("scoreNum").textContent="0";
+    $("jFill").style.width="0%"; $("plane").style.left="0%"; $("jPct").textContent="0%"; updateBackground(0);
+    renderStart(); };
+}
+
+renderStart();
+</script>
+</body>
+</html>
